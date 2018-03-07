@@ -1,0 +1,5 @@
+*.o
+cmdline.h
+cmdline.c
+ws-echo
+

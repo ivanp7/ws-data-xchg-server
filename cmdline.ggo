@@ -1,0 +1,27 @@
+package "ws-echo"
+version "0.1"
+purpose "A WebSocket echo server with extra functionality."
+# usage "<usage>"
+# description "<description>"
+versiontext "(C) Ivan Podmazov <podmazov@gmail.com>\nDistributed under the terms of the MIT license"
+
+args "--include-getopt"
+
+section "Main options"
+option "port" p "port number the server will listen to" int typestr="number" default="60000" optional 
+
+# option <long> <short> "<desc>"
+# {details="<detailed description>"}
+# {argtype} {typestr="<type descr>"}
+# {values="<value1>","<value2>",...}
+# {default="<default value>"}
+# {dependon="<other option>"}
+# {required} {argoptional} {multiple}
+# {hidden}
+
+# option <long> <short> "<desc>" flag <on/off>
+
+# section "section name" {sectiondesc="optional section description"}
+
+text ""
+
