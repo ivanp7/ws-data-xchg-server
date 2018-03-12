@@ -1,6 +1,7 @@
 // Robotics Lab server
 // Written by Ivan Podmazov, 2018
 
+#include <string.h>
 #include <stdlib.h>
 #include <locale.h>
 #include <signal.h>
@@ -12,7 +13,8 @@
 #include "broadcast-echo-protocol.h"
 #include "bulletin-board-protocol.h"
 
-static int callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
+static int callback_http(
+        struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
     switch (reason)
     {
@@ -45,7 +47,7 @@ static struct lws_protocols protocols[] =
     {
         "13", // backward compatibility with the old server
         callback_broadcast_echo,
-        0,
+        sizeof(struct per_session_data__broadcast_echo_protocol),
     },
     {
         "bulletin-board-protocol",
@@ -59,7 +61,7 @@ volatile sig_atomic_t done = 0;
 static void term(int signo)
 {
     done = 1;
-    server_log_message("Shutting down.");
+    SERVER_LOG_EVENT("Shutting down.");
 }
 
 int main(int argc, char *argv[])
@@ -73,41 +75,55 @@ int main(int argc, char *argv[])
     sigaction(SIGTERM, &action, NULL);
 
     struct gengetopt_args_info ai;
-    if (cmdline_parser(argc, argv, &ai) != 0) {
+    if (cmdline_parser(argc, argv, &ai) != 0) 
+    {
         return 1;
     }
 
-    if ((ai.port_arg < 0) || (ai.port_arg > 0xFFFF)) {
+    if ((ai.port_arg < 0) || (ai.port_arg > 0xFFFF)) 
+    {
         fprintf(stderr, "Invalid port number %i\n", ai.port_arg);
         fprintf(stderr, "Shutting down.\n");
         return 1;
     }
 
+    if (ai.output_limit_arg < 0)
+    {
+
+        fprintf(stderr, "Invalid data output limit %i\n", ai.output_limit_arg);
+        fprintf(stderr, "Shutting down.\n");
+        return 1;
+    }
+    server_log_data_output_limit = (ai.output_limit_given)? ai.output_limit_arg: -1;
+
     struct lws_context_creation_info info;
     memset(&info, 0, sizeof(info));
-
     info.port = ai.port_arg;
     info.protocols = protocols;
     info.gid = -1;
     info.uid = -1;
 
     struct lws_context *context = lws_create_context(&info);
-
-    if (context == NULL) {
+    if (context == NULL) 
+    {
         fprintf(stderr, "Initialization of the libwebsocket has failed!\n");
         fprintf(stderr, "Shutting down.\n");
         return 2;
     }
 
-    server_log_message("The server has been started.");
+    init_broadcast_echo_protocol();
+
+    SERVER_LOG_EVENT("The server has been started.");
     while (!done)
     {
-        /* lws_service(context, 50); */
+        lws_service(context, 50);
     }
+
+    deinit_broadcast_echo_protocol();
 
     lws_context_destroy(context);
 
-    server_log_message("The server has been stopped.");
+    SERVER_LOG_EVENT("The server has been stopped.");
     return 0;
 }
 

@@ -13,7 +13,7 @@ CMDLINEARGS_FILE_PREFIX = cmdline
 _DEPS = $(CMDLINEARGS_FILE_PREFIX).h log.h broadcast-echo-protocol.h bulletin-board-protocol.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = $(CMDLINEARGS_FILE_PREFIX).o server.o broadcast-echo-protocol.o bulletin-board-protocol.o
+_OBJ = $(CMDLINEARGS_FILE_PREFIX).o server.o log.o broadcast-echo-protocol.o bulletin-board-protocol.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(EXEC_NAME): $(OBJ)

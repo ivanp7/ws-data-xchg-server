@@ -12,8 +12,6 @@ option "port" p "Port number the server will listen to"
     int typestr="NUMBER" default="60000" optional 
 
 section "Output options"
-option "log" o "Type of the events to be logged" 
-    enum typestr="TYPE" values="none","conn","data","all" default="all" optional 
 option "output-limit" l "If provided, limit message data output to the first N bytes" 
     int typestr="N" optional 
 
