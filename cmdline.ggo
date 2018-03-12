@@ -1,27 +1,21 @@
-package "ws-echo"
+package "ws-data-xchg-server"
 version "0.1"
-purpose "A WebSocket echo server with extra functionality."
+purpose "A WebSocket data exchange server."
 # usage "<usage>"
 # description "<description>"
 versiontext "(C) Ivan Podmazov <podmazov@gmail.com>\nDistributed under the terms of the MIT license"
 
 args "--include-getopt"
 
-section "Main options"
-option "port" p "port number the server will listen to" int typestr="number" default="60000" optional 
+section "Net options"
+option "port" p "Port number the server will listen to" 
+    int typestr="NUMBER" default="60000" optional 
 
-# option <long> <short> "<desc>"
-# {details="<detailed description>"}
-# {argtype} {typestr="<type descr>"}
-# {values="<value1>","<value2>",...}
-# {default="<default value>"}
-# {dependon="<other option>"}
-# {required} {argoptional} {multiple}
-# {hidden}
-
-# option <long> <short> "<desc>" flag <on/off>
-
-# section "section name" {sectiondesc="optional section description"}
+section "Output options"
+option "log" o "Type of the events to be logged" 
+    enum typestr="TYPE" values="none","conn","data","all" default="all" optional 
+option "output-limit" l "If provided, limit message data output to the first N bytes" 
+    int typestr="N" optional 
 
 text ""
 

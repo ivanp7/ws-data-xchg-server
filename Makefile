@@ -1,34 +1,34 @@
-TARGET_NAME = ws-echo
+EXEC_NAME = ws-data-xchg-server
 
 IDIR = .
 ODIR = .
 
 CC     = gcc
-CFLAGS = -I$(IDIR)
+CFLAGS = -I$(IDIR) -Wall
 LIBS   = -lwebsockets
 
 GGO    = gengetopt
-GGO_FILE_PREFIX = cmdline
+CMDLINEARGS_FILE_PREFIX = cmdline
 
-_DEPS = $(GGO_FILE_PREFIX).h echoserver.h
+_DEPS = $(CMDLINEARGS_FILE_PREFIX).h log.h broadcast-echo-protocol.h bulletin-board-protocol.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = $(GGO_FILE_PREFIX).o main.o echoserver.o
+_OBJ = $(CMDLINEARGS_FILE_PREFIX).o server.o broadcast-echo-protocol.o bulletin-board-protocol.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
-$(TARGET_NAME): $(OBJ)
+$(EXEC_NAME): $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
 $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-$(GGO_FILE_PREFIX).c: $(GGO_FILE_PREFIX).ggo
+$(CMDLINEARGS_FILE_PREFIX).c: $(CMDLINEARGS_FILE_PREFIX).ggo
 	$(GGO) --input=$<
 
 .PHONY: clean clean-all
 clean:
 	rm -f $(ODIR)/*.o
 
-clean-all:
-	rm -f $(ODIR)/*.o $(TARGET_NAME)
+clean-all: clean
+	rm -f $(EXEC_NAME)
 
