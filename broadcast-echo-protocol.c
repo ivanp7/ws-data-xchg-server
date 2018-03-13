@@ -17,6 +17,7 @@ static size_t register_client(struct lws **clients, struct lws *wsi)
         return 0;
 
     clients[clients_count] = wsi;
+    clients_count++;
     return 1;
 }
 
@@ -26,13 +27,14 @@ static size_t forget_client(struct lws **clients, struct lws *wsi)
         return 0;
 
     size_t i = 0;
-    while ((clients[i] != wsi) && (i < clients_count))
+    while ((i < clients_count) && (clients[i] != wsi))
         i++;
 
     if (i < clients_count)
     {
         while (i < clients_count - 1)
             clients[i] = clients[i+1];
+        clients_count--;
         return 1;
     }
     else
@@ -54,8 +56,8 @@ static struct message* new_message(void *in, size_t len)
     struct message *msg = (struct message*)malloc(sizeof(struct message));
     msg->in_queues = 0;
     msg->buffer_length = len;
-    msg->buffer = malloc(len);
-    memcpy(msg->buffer, in, len);
+    msg->buffer = malloc(LWS_PRE + len);
+    memcpy(&((unsigned char*)msg->buffer)[LWS_PRE], in, len);
     return msg;
 }
 
@@ -63,48 +65,6 @@ static void delete_message(struct message *msg)
 {
     free(msg->buffer);
     free(msg);
-}
-
-struct message_node
-{
-    struct message *msg;
-    struct message_node *next;
-};
-
-static struct message_node* push_message(struct message_node *queue, struct message *msg)
-{
-    struct message_node *node = (struct message_node*)malloc(sizeof(struct message_node));
-    node->msg = msg;
-    node->next = NULL;
-
-    if (queue == NULL)
-        return node;
-    else
-    {
-        struct message_node *cur = queue;
-        while (cur->next != NULL)
-            cur = cur->next;
-        cur->next = node;
-        return queue;
-    }
-}
-
-static struct message* first_message(struct message_node *queue)
-{
-    if (queue != NULL)
-        return queue->msg;
-    else
-        return NULL;
-}
-
-static struct message_node* pop_message(struct message_node *queue)
-{
-    if (queue == NULL)
-        return NULL;
-
-    struct message_node *next = queue->next;
-    free(queue);
-    return next;
 }
 
 // ======================================================================================
@@ -131,13 +91,15 @@ int callback_broadcast_echo(
     switch (reason)
     {
         case LWS_CALLBACK_ESTABLISHED:
-            if (clients_count == MAX_BROADCAST_ECHO_CLIENTS)
+            if (!register_client(clients, wsi))
             {
                 SERVER_LOG_ERROR("A client couldn't connect -- the server is full!");
                 return -1;
             }
 
-            clients_count += register_client(clients, wsi);
+            psd = (struct per_session_data__broadcast_echo_protocol*)user;
+            psd->messages_queue = NULL;
+
             SERVER_LOG_EVENT("A client has connected.");
             break;
 
@@ -150,7 +112,7 @@ int callback_broadcast_echo(
                 if (clients[i] != wsi)
                 {
                     psd = (struct per_session_data__broadcast_echo_protocol*)lws_wsi_user(clients[i]);
-                    psd->messages_queue = push_message(psd->messages_queue, msg);
+                    psd->messages_queue = queue_push(psd->messages_queue, msg);
                     msg->in_queues++;
                 }
 
@@ -159,11 +121,13 @@ int callback_broadcast_echo(
 
         case LWS_CALLBACK_SERVER_WRITEABLE:
             psd = (struct per_session_data__broadcast_echo_protocol*)user;
-            msg = first_message(psd->messages_queue);
+            msg = queue_head_data(psd->messages_queue);
+            if (msg == NULL)
+                break;
             
             lws_write(wsi, &((unsigned char*)msg->buffer)[LWS_PRE], msg->buffer_length, LWS_WRITE_BINARY);
 
-            psd->messages_queue = pop_message(psd->messages_queue);
+            psd->messages_queue = queue_pop(psd->messages_queue);
             msg->in_queues--;
             if (msg->in_queues == 0)
                 delete_message(msg);
@@ -173,12 +137,16 @@ int callback_broadcast_echo(
             psd = (struct per_session_data__broadcast_echo_protocol*)user;
             while (psd->messages_queue != NULL)
             {
-                msg = first_message(psd->messages_queue);
-                delete_message(msg);
-                psd->messages_queue = pop_message(psd->messages_queue);
+                msg = queue_head_data(psd->messages_queue);
+                psd->messages_queue = queue_pop(psd->messages_queue);
+
+                msg->in_queues--;
+                if (msg->in_queues == 0)
+                    delete_message(msg);
             }
 
             clients_count -= forget_client(clients, wsi);
+
             SERVER_LOG_EVENT("A client has disconnected.");
             break;
 

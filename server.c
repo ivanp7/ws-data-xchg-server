@@ -87,14 +87,16 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (ai.output_limit_arg < 0)
+    if (ai.output_given && (ai.output_arg < 0))
     {
 
-        fprintf(stderr, "Invalid data output limit %i\n", ai.output_limit_arg);
+        fprintf(stderr, "Invalid data output limit %i\n", ai.output_arg);
         fprintf(stderr, "Shutting down.\n");
         return 1;
     }
-    server_log_data_output_limit = (ai.output_limit_given)? ai.output_limit_arg: -1;
+    server_log_data_output_limit = (ai.output_given)? ai.output_arg: -1;
+
+    gettimeofday(&server_start_time, NULL);
 
     struct lws_context_creation_info info;
     memset(&info, 0, sizeof(info));
@@ -119,9 +121,8 @@ int main(int argc, char *argv[])
         lws_service(context, 50);
     }
 
-    deinit_broadcast_echo_protocol();
-
     lws_context_destroy(context);
+    deinit_broadcast_echo_protocol();
 
     SERVER_LOG_EVENT("The server has been stopped.");
     return 0;

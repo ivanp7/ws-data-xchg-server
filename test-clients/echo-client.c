@@ -11,7 +11,8 @@ static struct lws *web_socket = NULL;
 #define EXAMPLE_RX_BUFFER_BYTES (10)
 
 char client_symbol = 'X';
-static int callback_broadcast_echo(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
+static int callback_broadcast_echo(
+        struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
     switch (reason)
     {
@@ -21,17 +22,27 @@ static int callback_broadcast_echo(struct lws *wsi, enum lws_callback_reasons re
 
         case LWS_CALLBACK_CLIENT_RECEIVE:
             /* Handle incomming messages here. */
-            printf("Received '%.*s'\n", len - LWS_SEND_BUFFER_PRE_PADDING - LWS_SEND_BUFFER_POST_PADDING, 
-                    (char*)((char*)in)[LWS_SEND_BUFFER_PRE_PADDING]);
+            printf("Received %li bytes", len);
+            unsigned char c;
+            printf(": {");
+            for (int i = 0; i < len; i++)
+            {
+                c = (unsigned char)((char*)in)[i];
+                if ((c < 32) || (c == 127) || (c == 255))
+                    printf("~");
+                else
+                    printf("%c", c);
+            }
+            printf("}\n");
             break;
 
         case LWS_CALLBACK_CLIENT_WRITEABLE:
         {
-            unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + EXAMPLE_RX_BUFFER_BYTES + LWS_SEND_BUFFER_POST_PADDING];
-            unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
-            size_t n = sprintf((char*)p, "%u", rand());
+            unsigned char buf[LWS_PRE + EXAMPLE_RX_BUFFER_BYTES];
+            unsigned char *p = &buf[LWS_PRE];
+            size_t n = sprintf((char*)p, "%u", rand()%1000);
             p[0] = client_symbol;
-            lws_write(wsi, p, n, LWS_WRITE_TEXT);
+            lws_write(wsi, p, n, LWS_WRITE_BINARY);
             break;
         }
 
@@ -82,9 +93,9 @@ int main(int argc, char *argv[])
 
     int port = 60000;
     if (argc > 1)
-        port = atoi(argv[1]);
+        client_symbol = argv[1][0];
     if (argc > 2)
-        client_symbol = argv[2][0];
+        port = atoi(argv[2]);
     printf("Client symbol: %c\n", client_symbol);
     printf("Connecting to port number %i\n", port);
 

@@ -1,11 +1,13 @@
 #pragma once
 
+#include "queue.h"
+
 #include <libwebsockets.h>
 
 struct message_node;
 struct per_session_data__broadcast_echo_protocol
 {
-    struct message_node *messages_queue;
+    struct queue_node *messages_queue;
 };
 
 void init_broadcast_echo_protocol(void);

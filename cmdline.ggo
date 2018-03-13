@@ -12,7 +12,7 @@ option "port" p "Port number the server will listen to"
     int typestr="NUMBER" default="60000" optional 
 
 section "Output options"
-option "output-limit" l "If provided, limit message data output to the first N bytes" 
+option "output" o "If provided, output the first N bytes of incoming message data" 
     int typestr="N" optional 
 
 text ""
