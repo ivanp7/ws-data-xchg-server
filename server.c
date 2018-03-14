@@ -61,7 +61,7 @@ volatile sig_atomic_t done = 0;
 static void term(int signo)
 {
     done = 1;
-    SERVER_LOG_EVENT("Shutting down.");
+    server_log_event("Shutting down.");
 }
 
 int main(int argc, char *argv[])
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
     init_broadcast_echo_protocol();
     init_bulletin_board_protocol();
 
-    SERVER_LOG_EVENT("The server has been started.");
+    server_log_event("The server has been started.");
     while (!done)
     {
         lws_service(context, 50);
@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
     deinit_broadcast_echo_protocol();
     deinit_bulletin_board_protocol();
 
-    SERVER_LOG_EVENT("The server has been stopped.");
+    server_log_event("The server has been stopped.");
     return 0;
 }
 

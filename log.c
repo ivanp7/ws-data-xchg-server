@@ -2,8 +2,9 @@
 
 #include <time.h>
 #include <string.h>
+#include <stdarg.h>
 
-double get_server_time()
+static double get_server_time()
 {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
@@ -12,14 +13,37 @@ double get_server_time()
         ((current_time.tv_usec - server_start_time.tv_usec)/1000000.0);
 }
 
-void print_log_entry_prefix(FILE *out)
+static void print_log_entry_prefix(FILE *out)
 {
     time_t raw_time = time(NULL);
     char *time_str = ctime(&raw_time);
     fprintf(out, "[%.*s | %f] ", (int)strlen(time_str)-1, time_str, get_server_time());
 }
 
-void SERVER_LOG_DATA(void *in, size_t len)
+static void server_log(FILE *out, const char *format, va_list arglist)
+{
+    print_log_entry_prefix(out);
+    vfprintf(out, format, arglist);
+    fprintf(out, "\n");
+}
+
+void server_log_event(const char *format, ...)
+{
+    va_list arglist;
+    va_start(arglist, format);
+    server_log(stdout, format, arglist);
+    va_end(arglist);
+}
+
+void server_log_error(const char *format, ...)
+{
+    va_list arglist;
+    va_start(arglist, format);
+    server_log(stderr, format, arglist);
+    va_end(arglist);
+}
+
+void server_log_data(void *in, size_t len)
 {
     if (server_log_data_output_limit < 0)
         return;

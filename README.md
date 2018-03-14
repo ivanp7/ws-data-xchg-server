@@ -41,8 +41,9 @@ Then, the communication is carried out using the following protocol.
 * R:{name1},...,{nameN} -- request the stored data of the clients with names {name1}, ..., {nameN};
 * S:{name1},...,{nameN}:{bytes of data} -- send {bytes of data} directly to the clients with the specified names.
 
-#### Responces:
+#### Responses:
 
+* O -- success;
 * F -- fail by the reason of the invalid request;
 * L:{name1},...,{nameN} -- list of all (excluding the requester) clients' names currently connected to the server;
 * R:{name}:{bytes of data} -- requested data of the client named {name};

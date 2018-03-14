@@ -6,12 +6,13 @@
 
 struct per_session_data__bulletin_board_protocol
 {
+    struct queue_node *messages_queue;
+
     char *client_name;
 
-    void *data;
+    void *data_buffer;
     size_t data_length;
-
-    struct queue_node *messages_queue;
+    size_t buffer_length;
 };
 
 void init_bulletin_board_protocol(void);

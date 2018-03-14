@@ -7,23 +7,10 @@
 #include <stdio.h>
 
 struct timeval server_start_time;
-double get_server_time();
 
-void print_log_entry_prefix(FILE *out);
-
-#define SERVER_LOG_EVENT(args) \
-{ \
-    print_log_entry_prefix(stdout); \
-    fprintf(stdout, args); \
-    fprintf(stdout, "\n"); \
-}
-#define SERVER_LOG_ERROR(args) \
-{ \
-    print_log_entry_prefix(stderr); \
-    fprintf(stderr, args); \
-    fprintf(stderr, "\n"); \
-}
+void server_log_event(const char *format, ...);
+void server_log_error(const char *format, ...);
 
 int server_log_data_output_limit;
-void SERVER_LOG_DATA(void *in, size_t len);
+void server_log_data(void *in, size_t len);
 

@@ -4,7 +4,7 @@
 
 struct queue_node* queue_push(struct queue_node *queue, void *data)
 {
-    struct queue_node *node = (struct queue_node*)malloc(sizeof(struct queue_node));
+    struct queue_node *node = malloc(sizeof(struct queue_node));
     node->data = data;
     node->next = NULL;
 

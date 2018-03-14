@@ -5,7 +5,7 @@
 
 struct message* new_message(void *in, size_t len, size_t prefix_len)
 {
-    struct message *msg = (struct message*)malloc(sizeof(struct message));
+    struct message *msg = malloc(sizeof(struct message));
 
     msg->buffer_length = len;
     msg->buffer = malloc(prefix_len + len);
