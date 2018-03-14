@@ -1,4 +1,4 @@
-# WebSockets echo server
+# WebSockets data exchange server
 
 ## Dependencies:
 

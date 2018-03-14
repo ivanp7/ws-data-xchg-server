@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+// ======================================================================================
+
 #define EXAMPLE_RX_BUFFER_BYTES (10)
 struct payload
 {

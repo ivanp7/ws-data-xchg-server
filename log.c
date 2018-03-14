@@ -1,5 +1,8 @@
 #include "log.h"
 
+#include <time.h>
+#include <string.h>
+
 double get_server_time()
 {
     struct timeval current_time;
@@ -9,12 +12,21 @@ double get_server_time()
         ((current_time.tv_usec - server_start_time.tv_usec)/1000000.0);
 }
 
+void print_log_entry_prefix(FILE *out)
+{
+    time_t raw_time = time(NULL);
+    char *time_str = ctime(&raw_time);
+    fprintf(out, "[%.*s | %f] ", (int)strlen(time_str)-1, time_str, get_server_time());
+}
+
 void SERVER_LOG_DATA(void *in, size_t len)
 {
     if (server_log_data_output_limit < 0)
         return;
 
-    fprintf(stdout, "[%f] ", get_server_time());
+    time_t raw_time = time(NULL);
+    char *time_str = ctime(&raw_time);
+    fprintf(stdout, "[%.*s | %f] ", (int)strlen(time_str)-1, time_str, get_server_time());
 
     fprintf(stdout, "Received %li bytes", len);
 

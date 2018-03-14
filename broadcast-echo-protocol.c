@@ -1,4 +1,5 @@
 #include "broadcast-echo-protocol.h"
+#include "clients-array.h"
 #include "log.h"
 
 #include <string.h>
@@ -10,36 +11,6 @@
 
 static struct lws **clients;
 static size_t clients_count;
-
-static size_t register_client(struct lws **clients, struct lws *wsi)
-{
-    if (clients_count == MAX_BROADCAST_ECHO_CLIENTS)
-        return 0;
-
-    clients[clients_count] = wsi;
-    clients_count++;
-    return 1;
-}
-
-static size_t forget_client(struct lws **clients, struct lws *wsi)
-{
-    if (clients_count == 0)
-        return 0;
-
-    size_t i = 0;
-    while ((i < clients_count) && (clients[i] != wsi))
-        i++;
-
-    if (i < clients_count)
-    {
-        while (i < clients_count - 1)
-            clients[i] = clients[i+1];
-        clients_count--;
-        return 1;
-    }
-    else
-        return 0;
-}
 
 // ======================================================================================
 
@@ -91,7 +62,7 @@ int callback_broadcast_echo(
     switch (reason)
     {
         case LWS_CALLBACK_ESTABLISHED:
-            if (!register_client(clients, wsi))
+            if (!register_client(clients, &clients_count, wsi, MAX_BROADCAST_ECHO_CLIENTS))
             {
                 SERVER_LOG_ERROR("A client couldn't connect -- the server is full!");
                 return -1;
@@ -145,7 +116,7 @@ int callback_broadcast_echo(
                     delete_message(msg);
             }
 
-            clients_count -= forget_client(clients, wsi);
+            forget_client(clients, &clients_count, wsi);
 
             SERVER_LOG_EVENT("A client has disconnected.");
             break;
