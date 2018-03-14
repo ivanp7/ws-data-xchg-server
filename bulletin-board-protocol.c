@@ -1,4 +1,6 @@
 #include "bulletin-board-protocol.h"
+#include "clients-array.h"
+#include "message.h"
 #include "log.h"
 
 #include <string.h>
@@ -6,12 +8,25 @@
 
 // ======================================================================================
 
-#define EXAMPLE_RX_BUFFER_BYTES (10)
-struct payload
+#define MAX_BULLETIN_BOARD_CLIENTS (1024)
+
+static struct lws **clients;
+static size_t clients_count;
+
+// ======================================================================================
+
+void init_bulletin_board_protocol(void)
 {
-    unsigned char data[LWS_SEND_BUFFER_PRE_PADDING + EXAMPLE_RX_BUFFER_BYTES + LWS_SEND_BUFFER_POST_PADDING];
-    size_t len;
-} received_payload;
+    clients_count = 0;
+    clients = (struct lws**)malloc(sizeof(struct lws*) * MAX_BULLETIN_BOARD_CLIENTS);
+}
+
+void deinit_bulletin_board_protocol(void)
+{
+    free(clients);
+}
+
+// ======================================================================================
 
 int callback_bulletin_board(
         struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
@@ -21,7 +36,7 @@ int callback_bulletin_board(
         case LWS_CALLBACK_RECEIVE:
             /* memcpy( &received_payload.data[LWS_SEND_BUFFER_PRE_PADDING], in, len ); */
             /* received_payload.len = len; */
-            lws_callback_on_writable_all_protocol( lws_get_context( wsi ), lws_get_protocol( wsi ) );
+            /* lws_callback_on_writable_all_protocol( lws_get_context( wsi ), lws_get_protocol( wsi ) ); */
             break;
 
         case LWS_CALLBACK_SERVER_WRITEABLE:

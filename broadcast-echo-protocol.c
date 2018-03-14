@@ -1,8 +1,8 @@
 #include "broadcast-echo-protocol.h"
 #include "clients-array.h"
+#include "message.h"
 #include "log.h"
 
-#include <string.h>
 #include <stdlib.h>
 
 // ======================================================================================
@@ -13,32 +13,6 @@ static struct lws **clients;
 static size_t clients_count;
 
 // ======================================================================================
-
-struct message
-{
-    void *buffer;
-    size_t buffer_length;
-    
-    int in_queues;
-};
-
-static struct message* new_message(void *in, size_t len)
-{
-    struct message *msg = (struct message*)malloc(sizeof(struct message));
-
-    msg->buffer_length = len;
-    msg->buffer = malloc(LWS_PRE + len);
-    memcpy(&((unsigned char*)msg->buffer)[LWS_PRE], in, len);
-    msg->in_queues = 0;
-    
-    return msg;
-}
-
-static void delete_message(struct message *msg)
-{
-    free(msg->buffer);
-    free(msg);
-}
 
 static void register_message(struct lws **clients, size_t clients_count, struct message *msg, struct lws *wsi)
 {
@@ -51,38 +25,18 @@ static void register_message(struct lws **clients, size_t clients_count, struct 
         if (clients[i] != wsi)
         {
             psd = (struct per_session_data__broadcast_echo_protocol*)lws_wsi_user(clients[i]);
-            psd->messages_queue = queue_push(psd->messages_queue, msg);
-            msg->in_queues++;
+            psd->messages_queue = messages_queue_push(psd->messages_queue, msg);
         }
 }
 
-static void client_send(struct lws *wsi, struct per_session_data__broadcast_echo_protocol *psd)
+static void send_message(struct lws *wsi, struct per_session_data__broadcast_echo_protocol *psd)
 {
-    struct message *msg = queue_head_data(psd->messages_queue);
+    struct message *msg = queue_head(psd->messages_queue);
     if (msg == NULL)
         return;
 
     lws_write(wsi, &((unsigned char*)msg->buffer)[LWS_PRE], msg->buffer_length, LWS_WRITE_BINARY);
-
-    psd->messages_queue = queue_pop(psd->messages_queue);
-    msg->in_queues--;
-    if (msg->in_queues == 0)
-        delete_message(msg);
-}
-
-static void delete_messages_queue(struct per_session_data__broadcast_echo_protocol *psd)
-{
-    struct message *msg;
-
-    while (psd->messages_queue != NULL)
-    {
-        msg = queue_head_data(psd->messages_queue);
-        psd->messages_queue = queue_pop(psd->messages_queue);
-
-        msg->in_queues--;
-        if (msg->in_queues == 0)
-            delete_message(msg);
-    }
+    psd->messages_queue = messages_queue_pop(psd->messages_queue);
 }
 
 // ======================================================================================
@@ -115,13 +69,13 @@ int callback_broadcast_echo(
             }
 
             psd = (struct per_session_data__broadcast_echo_protocol*)user;
-            psd->messages_queue = NULL;
+            psd->messages_queue = new_messages_queue();
 
             SERVER_LOG_EVENT("A client has connected.");
             break;
 
         case LWS_CALLBACK_RECEIVE:
-            register_message(clients, clients_count, new_message(in, len), wsi);
+            register_message(clients, clients_count, new_message(in, len, LWS_PRE), wsi);
             lws_callback_on_writable_all_protocol(lws_get_context(wsi), lws_get_protocol(wsi));
 
             SERVER_LOG_DATA(in, len);
@@ -129,12 +83,12 @@ int callback_broadcast_echo(
 
         case LWS_CALLBACK_SERVER_WRITEABLE:
             psd = (struct per_session_data__broadcast_echo_protocol*)user;
-            client_send(wsi, psd);
+            send_message(wsi, psd);
             break;
 
         case LWS_CALLBACK_CLOSED:
             psd = (struct per_session_data__broadcast_echo_protocol*)user;
-            delete_messages_queue(psd);
+            psd->messages_queue = delete_messages_queue(psd->messages_queue);
 
             forget_client(clients, &clients_count, wsi);
 

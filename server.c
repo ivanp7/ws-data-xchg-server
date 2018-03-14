@@ -1,17 +1,17 @@
 // Robotics Lab server
 // Written by Ivan Podmazov, 2018
 
+#include "cmdline.h"
+#include "log.h"
+#include "broadcast-echo-protocol.h"
+#include "bulletin-board-protocol.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <locale.h>
 #include <signal.h>
 
 #include <libwebsockets.h>
-
-#include "cmdline.h"
-#include "log.h"
-#include "broadcast-echo-protocol.h"
-#include "bulletin-board-protocol.h"
 
 static int callback_http(
         struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
@@ -52,7 +52,7 @@ static struct lws_protocols protocols[] =
     {
         "bulletin-board-protocol",
         callback_bulletin_board,
-        0,
+        sizeof(struct per_session_data__bulletin_board_protocol),
     },
     { NULL, NULL, 0 } /* terminator */
 };
@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
     }
 
     init_broadcast_echo_protocol();
+    init_bulletin_board_protocol();
 
     SERVER_LOG_EVENT("The server has been started.");
     while (!done)
@@ -122,7 +123,9 @@ int main(int argc, char *argv[])
     }
 
     lws_context_destroy(context);
+
     deinit_broadcast_echo_protocol();
+    deinit_bulletin_board_protocol();
 
     SERVER_LOG_EVENT("The server has been stopped.");
     return 0;
