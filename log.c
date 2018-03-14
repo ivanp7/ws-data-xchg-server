@@ -24,10 +24,7 @@ void SERVER_LOG_DATA(void *in, size_t len)
     if (server_log_data_output_limit < 0)
         return;
 
-    time_t raw_time = time(NULL);
-    char *time_str = ctime(&raw_time);
-    fprintf(stdout, "[%.*s | %f] ", (int)strlen(time_str)-1, time_str, get_server_time());
-
+    print_log_entry_prefix(stdout);
     fprintf(stdout, "Received %li bytes", len);
 
     if (server_log_data_output_limit > 0)

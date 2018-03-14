@@ -25,10 +25,12 @@ struct message
 static struct message* new_message(void *in, size_t len)
 {
     struct message *msg = (struct message*)malloc(sizeof(struct message));
-    msg->in_queues = 0;
+
     msg->buffer_length = len;
     msg->buffer = malloc(LWS_PRE + len);
     memcpy(&((unsigned char*)msg->buffer)[LWS_PRE], in, len);
+    msg->in_queues = 0;
+    
     return msg;
 }
 
@@ -36,6 +38,51 @@ static void delete_message(struct message *msg)
 {
     free(msg->buffer);
     free(msg);
+}
+
+static void register_message(struct lws **clients, size_t clients_count, struct message *msg, struct lws *wsi)
+{
+    if (msg == NULL)
+        return;
+
+    struct per_session_data__broadcast_echo_protocol *psd;
+
+    for (size_t i = 0; i < clients_count; i++)
+        if (clients[i] != wsi)
+        {
+            psd = (struct per_session_data__broadcast_echo_protocol*)lws_wsi_user(clients[i]);
+            psd->messages_queue = queue_push(psd->messages_queue, msg);
+            msg->in_queues++;
+        }
+}
+
+static void client_send(struct lws *wsi, struct per_session_data__broadcast_echo_protocol *psd)
+{
+    struct message *msg = queue_head_data(psd->messages_queue);
+    if (msg == NULL)
+        return;
+
+    lws_write(wsi, &((unsigned char*)msg->buffer)[LWS_PRE], msg->buffer_length, LWS_WRITE_BINARY);
+
+    psd->messages_queue = queue_pop(psd->messages_queue);
+    msg->in_queues--;
+    if (msg->in_queues == 0)
+        delete_message(msg);
+}
+
+static void delete_messages_queue(struct per_session_data__broadcast_echo_protocol *psd)
+{
+    struct message *msg;
+
+    while (psd->messages_queue != NULL)
+    {
+        msg = queue_head_data(psd->messages_queue);
+        psd->messages_queue = queue_pop(psd->messages_queue);
+
+        msg->in_queues--;
+        if (msg->in_queues == 0)
+            delete_message(msg);
+    }
 }
 
 // ======================================================================================
@@ -56,7 +103,6 @@ void deinit_broadcast_echo_protocol(void)
 int callback_broadcast_echo(
         struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
-    struct message *msg;
     struct per_session_data__broadcast_echo_protocol *psd;
 
     switch (reason)
@@ -75,46 +121,20 @@ int callback_broadcast_echo(
             break;
 
         case LWS_CALLBACK_RECEIVE:
-            SERVER_LOG_DATA(in, len);
-
-            msg = new_message(in, len);
-
-            for (int i = 0; i < clients_count; i++)
-                if (clients[i] != wsi)
-                {
-                    psd = (struct per_session_data__broadcast_echo_protocol*)lws_wsi_user(clients[i]);
-                    psd->messages_queue = queue_push(psd->messages_queue, msg);
-                    msg->in_queues++;
-                }
-
+            register_message(clients, clients_count, new_message(in, len), wsi);
             lws_callback_on_writable_all_protocol(lws_get_context(wsi), lws_get_protocol(wsi));
+
+            SERVER_LOG_DATA(in, len);
             break;
 
         case LWS_CALLBACK_SERVER_WRITEABLE:
             psd = (struct per_session_data__broadcast_echo_protocol*)user;
-            msg = queue_head_data(psd->messages_queue);
-            if (msg == NULL)
-                break;
-            
-            lws_write(wsi, &((unsigned char*)msg->buffer)[LWS_PRE], msg->buffer_length, LWS_WRITE_BINARY);
-
-            psd->messages_queue = queue_pop(psd->messages_queue);
-            msg->in_queues--;
-            if (msg->in_queues == 0)
-                delete_message(msg);
+            client_send(wsi, psd);
             break;
 
         case LWS_CALLBACK_CLOSED:
             psd = (struct per_session_data__broadcast_echo_protocol*)user;
-            while (psd->messages_queue != NULL)
-            {
-                msg = queue_head_data(psd->messages_queue);
-                psd->messages_queue = queue_pop(psd->messages_queue);
-
-                msg->in_queues--;
-                if (msg->in_queues == 0)
-                    delete_message(msg);
-            }
+            delete_messages_queue(psd);
 
             forget_client(clients, &clients_count, wsi);
 
