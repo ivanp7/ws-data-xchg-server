@@ -67,7 +67,7 @@ enum protocols
 static struct lws_protocols protocols[] =
 {
     {
-        "13", // backward compatibility with the old server
+        "broadcast-echo-protocol",
         callback_broadcast_echo,
         0
     },
