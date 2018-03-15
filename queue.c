@@ -1,3 +1,4 @@
+#include "server.h"
 #include "queue.h"
 
 #include <stdlib.h>
@@ -5,6 +6,12 @@
 struct queue_node* queue_push(struct queue_node *queue, void *data)
 {
     struct queue_node *node = malloc(sizeof(struct queue_node));
+    if (is_memory_allocation_failed(node, __FILE__, __LINE__))
+    {
+        stop_server();
+        return NULL;
+    }
+    
     node->data = data;
     node->next = NULL;
 

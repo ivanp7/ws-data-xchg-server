@@ -1,6 +1,7 @@
-// Robotics Lab server
+// A WebSocket data exchange server
 // Written by Ivan Podmazov, 2018
 
+#include "server.h"
 #include "cmdline.h"
 #include "log.h"
 #include "broadcast-echo-protocol.h"
@@ -12,6 +13,34 @@
 #include <signal.h>
 
 #include <libwebsockets.h>
+
+// ======================================================================================
+
+static volatile sig_atomic_t done = 0;
+
+static inline sig_atomic_t is_server_running()
+{
+    return !done;
+}
+
+void stop_server()
+{
+    done = 1;
+    server_log_event("Shutting down.");
+}
+
+int is_memory_allocation_failed(void *mem, const char *file, int line)
+{
+    if (mem == NULL)
+    {
+        server_log_error("Memory allocation fail at: '%s', line %i", file, line);
+        return 1;
+    }
+
+    return 0;
+}
+
+// ======================================================================================
 
 static int callback_http(
         struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
@@ -57,11 +86,11 @@ static struct lws_protocols protocols[] =
     { NULL, NULL, 0 } /* terminator */
 };
 
-volatile sig_atomic_t done = 0;
+// ======================================================================================
+
 static void term(int signo)
 {
-    done = 1;
-    server_log_event("Shutting down.");
+    stop_server();
 }
 
 int main(int argc, char *argv[])
@@ -71,7 +100,8 @@ int main(int argc, char *argv[])
     struct sigaction action;
     memset(&action, 0, sizeof(action));
     action.sa_handler = term;
-    sigaction(SIGINT, &action, NULL);
+    sigaction(SIGABRT, &action, NULL);
+    sigaction(SIGINT,  &action, NULL);
     sigaction(SIGTERM, &action, NULL);
 
     struct gengetopt_args_info ai;
@@ -113,11 +143,12 @@ int main(int argc, char *argv[])
         return 2;
     }
 
+    server_log_event("The server has been started.");
+
     init_broadcast_echo_protocol();
     init_bulletin_board_protocol();
 
-    server_log_event("The server has been started.");
-    while (!done)
+    while (is_server_running())
     {
         lws_service(context, 50);
     }

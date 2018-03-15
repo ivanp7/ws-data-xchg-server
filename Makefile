@@ -10,7 +10,7 @@ LIBS   = -lwebsockets
 GGO    = gengetopt
 CMDLINEARGS_FILE_PREFIX = cmdline
 
-_DEPS = $(CMDLINEARGS_FILE_PREFIX).h log.h queue.h message.h clients-array.h broadcast-echo-protocol.h bulletin-board-protocol.h
+_DEPS = $(CMDLINEARGS_FILE_PREFIX).h server.h log.h queue.h message.h clients-array.h broadcast-echo-protocol.h bulletin-board-protocol.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 _OBJ = $(CMDLINEARGS_FILE_PREFIX).o server.o log.o queue.o message.o clients-array.o broadcast-echo-protocol.o bulletin-board-protocol.o

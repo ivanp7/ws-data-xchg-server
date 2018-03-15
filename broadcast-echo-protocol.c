@@ -1,3 +1,4 @@
+#include "server.h"
 #include "broadcast-echo-protocol.h"
 #include "clients-array.h"
 #include "message.h"
@@ -16,6 +17,8 @@ void init_broadcast_echo_protocol(void)
 {
     clients_count = 0;
     clients = malloc(sizeof(struct lws*) * MAX_BROADCAST_ECHO_CLIENTS);
+    if (is_memory_allocation_failed(clients, __FILE__, __LINE__))
+        stop_server();
 }
 
 void deinit_broadcast_echo_protocol(void)
@@ -31,12 +34,15 @@ static void register_message(struct lws **clients, size_t clients_count, struct 
         return;
 
     struct per_session_data__broadcast_echo_protocol *psd;
+    struct queue_node *node;
 
     for (size_t i = 0; i < clients_count; i++)
         if (clients[i] != wsi)
         {
             psd = lws_wsi_user(clients[i]);
-            psd->messages_queue = messages_queue_push(psd->messages_queue, msg);
+            node = messages_queue_push(psd->messages_queue, msg);
+            if (node != NULL)
+                psd->messages_queue = node;
         }
 }
 
@@ -64,10 +70,14 @@ int callback_broadcast_echo(
             break;
 
         case LWS_CALLBACK_RECEIVE:
-            register_message(clients, clients_count, wsi, new_message(in, len, LWS_PRE));
-            lws_callback_on_writable_all_protocol(lws_get_context(wsi), lws_get_protocol(wsi));
-
             server_log_data(in, len);
+
+            msg = new_message(in, len, LWS_PRE);
+            if (msg != NULL)
+            {
+                register_message(clients, clients_count, wsi, msg);
+                lws_callback_on_writable_all_protocol(lws_get_context(wsi), lws_get_protocol(wsi));
+            }
             break;
 
         case LWS_CALLBACK_SERVER_WRITEABLE:
