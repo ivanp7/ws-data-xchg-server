@@ -17,7 +17,7 @@ void init_broadcast_echo_protocol(void)
 {
     clients_count = 0;
     clients = malloc(sizeof(struct lws*) * MAX_BROADCAST_ECHO_CLIENTS);
-    if (is_memory_allocation_failed(clients, __FILE__, __LINE__))
+    if (has_memory_allocation_failed(clients, __FILE__, __LINE__))
         stop_server();
 }
 
@@ -41,9 +41,15 @@ static void register_message(struct lws **clients, size_t clients_count, struct 
         {
             psd = lws_wsi_user(clients[i]);
             node = messages_queue_push(psd->messages_queue, msg);
-            if (node != NULL)
-                psd->messages_queue = node;
+            if (has_memory_allocation_failed(node, __FILE__, __LINE__))
+            {
+                stop_server();
+                return;
+            }
+            psd->messages_queue = node;
         }
+
+    lws_callback_on_writable_all_protocol(lws_get_context(wsi), lws_get_protocol(wsi));
 }
 
 // ======================================================================================
@@ -51,7 +57,7 @@ static void register_message(struct lws **clients, size_t clients_count, struct 
 int callback_broadcast_echo(
         struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
-    struct per_session_data__broadcast_echo_protocol *psd;
+    struct per_session_data__broadcast_echo_protocol *psd = user;
     struct message *msg;
 
     switch (reason)
@@ -63,7 +69,6 @@ int callback_broadcast_echo(
                 return -1;
             }
 
-            psd = user;
             psd->messages_queue = new_messages_queue();
 
             server_log_event("A client has connected.");
@@ -73,15 +78,16 @@ int callback_broadcast_echo(
             server_log_data(in, len);
 
             msg = new_message(in, len, LWS_PRE);
-            if (msg != NULL)
+            if (has_memory_allocation_failed(msg, __FILE__, __LINE__))
             {
-                register_message(clients, clients_count, wsi, msg);
-                lws_callback_on_writable_all_protocol(lws_get_context(wsi), lws_get_protocol(wsi));
+                stop_server();
+                break;
             }
+
+            register_message(clients, clients_count, wsi, msg);
             break;
 
         case LWS_CALLBACK_SERVER_WRITEABLE:
-            psd = user;
             msg = queue_head(psd->messages_queue);
             if (msg == NULL)
                 break;
@@ -92,8 +98,6 @@ int callback_broadcast_echo(
 
         case LWS_CALLBACK_CLOSED:
             forget_client(clients, &clients_count, wsi);
-
-            psd = user;
             psd->messages_queue = delete_messages_queue(psd->messages_queue);
 
             server_log_event("A client has disconnected.");

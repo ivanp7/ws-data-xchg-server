@@ -31,6 +31,7 @@ except the message authors.
 The server implements the bulletin board intercommunication model.
 After connecting to the server, a client is required to register by sending
 its name with the very first message to the server. A correct name is a string
+shorter than 16 characters
 that does not contain any other characters except 'A'-'Z', 'a'-'z', '0'-'9', '-' and '\_'.
 Then, the communication is carried out using the following protocol.
 

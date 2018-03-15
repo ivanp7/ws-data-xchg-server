@@ -1,4 +1,3 @@
-#include "server.h"
 #include "message.h"
 
 #include <stdlib.h>
@@ -7,18 +6,14 @@
 struct message* new_message(void *in, size_t len, size_t prefix_len)
 {
     struct message *msg = malloc(sizeof(struct message));
-    if (is_memory_allocation_failed(msg, __FILE__, __LINE__))
-    {
-        stop_server();
+    if (msg == NULL)
         return NULL;
-    }
 
     msg->buffer_length = len;
     msg->buffer = malloc(prefix_len + len);
-    if (is_memory_allocation_failed(msg->buffer, __FILE__, __LINE__))
+    if (msg->buffer == NULL)
     {
         free(msg);
-        stop_server();
         return NULL;
     }
 
@@ -50,8 +45,10 @@ struct queue_node* delete_messages_queue(struct queue_node *messages_queue)
 struct queue_node* messages_queue_push(struct queue_node *messages_queue, struct message *msg)
 {
     struct queue_node *node = queue_push(messages_queue, msg);
-    if (node != NULL)
-        msg->in_queues++;
+    if (node == NULL)
+        return NULL;
+
+    msg->in_queues++;
     return node;
 }
 
