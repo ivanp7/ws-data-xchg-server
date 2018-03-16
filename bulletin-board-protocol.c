@@ -99,7 +99,7 @@ static int parse_client_list(
         struct lws ***selected_clients, int *num_clients)
 {
     return 0;
-    // TODO
+    // TODO: предотвращение ненужного повторного копирования данных
 }
 
 static int find_client_by_name(
@@ -146,9 +146,9 @@ static int respond(
 }
 
 static int respond_with_data(
-        struct lws *wsi, struct per_session_data__bulletin_board_protocol *psd, const void *data, size_t len)
+        struct lws *wsi, struct per_session_data__bulletin_board_protocol *psd, void *data_buffer, size_t len)
 {
-    struct message *msg = new_message(data, len, LWS_PRE);
+    struct message *msg = new_message(data_buffer, len);
     if (has_memory_allocation_failed(msg))
         return 0;
 
@@ -164,7 +164,11 @@ static int respond_with_data(
 static int respond_with_status(
         struct lws *wsi, struct per_session_data__bulletin_board_protocol *psd, const char *s)
 {
-    return respond_with_data(wsi, psd, s, STATUS_LENGTH);
+    void *data_buffer = new_data_buffer(s, STATUS_LENGTH);
+    if (data_buffer == NULL)
+        return 0;
+
+    return respond_with_data(wsi, psd, data_buffer, STATUS_LENGTH);
 }
 
 // ======================================================================================
@@ -196,8 +200,9 @@ static int respond_with_stored_data(
 
     size_t name_len;
     size_t response_len;
-    char *response_buf = NULL;
+    void *response_buf = NULL;
     size_t buf_len = 0;
+    char *response_buf_data;
 
     int result;
     for (int i = 0; i < num_clients; i++)
@@ -208,7 +213,7 @@ static int respond_with_stored_data(
         response_len = 2 + name_len + 1 + p->data_length;
         if (response_len > buf_len)
         {
-            char *new_buf = realloc(response_buf, response_len);
+            char *new_buf = extend_data_buffer(response_buf, response_len);
             if (has_memory_allocation_failed(new_buf))
             {
                 result = 0;
@@ -218,18 +223,18 @@ static int respond_with_stored_data(
             buf_len = response_len;
         }
 
-        response_buf[0] = 'R';
-        response_buf[1] = ':';
-        memcpy(response_buf + 2, p->client_name, name_len);
-        response_buf[2+name_len] = ':';
-        memcpy(response_buf + 2+name_len+1, p->data_buffer, p->data_length);
+        response_buf_data = data_buffer_data(response_buf);
+        response_buf_data[0] = 'R';
+        response_buf_data[1] = ':';
+        memcpy(response_buf_data + 2, p->client_name, name_len);
+        response_buf_data[2+name_len] = ':';
+        memcpy(response_buf_data + 2+name_len+1, p->data_buffer, p->data_length);
 
         result = respond_with_data(wsi, psd, response_buf, response_len);
         if (!result)
             break;
     }
 
-    free(response_buf);
     return result;
 }
 
@@ -241,15 +246,16 @@ static int respond_with_sent_data(
 
     size_t name_len = strlen(psd->client_name);
     size_t response_len = 2 + name_len + 1 + len;
-    char *response_buf = malloc(response_len);
+    char *response_buf = new_data_buffer(NULL, response_len);
     if (has_memory_allocation_failed(response_buf))
         return 0;
+    char *response_buf_data = data_buffer_data(response_buf);
 
-    response_buf[0] = 'S';
-    response_buf[1] = ':';
-    memcpy(response_buf + 2, psd->client_name, name_len);
-    response_buf[2+name_len] = ':';
-    memcpy(response_buf + 2+name_len+1, data, len);
+    response_buf_data[0] = 'S';
+    response_buf_data[1] = ':';
+    memcpy(response_buf_data + 2, psd->client_name, name_len);
+    response_buf_data[2+name_len] = ':';
+    memcpy(response_buf_data + 2+name_len+1, data, len);
 
     int result;
     for (int i = 0; i < num_clients; i++)
@@ -261,7 +267,6 @@ static int respond_with_sent_data(
             break;
     }
 
-    free(response_buf);
     return result;
 }
 
@@ -318,7 +323,6 @@ static int process_request(
                 return 0;
 
             result = respond_with_data(wsi, psd, response_buf, response_len);
-            free(response_buf);
             return result;
 
         /* case 'p': */

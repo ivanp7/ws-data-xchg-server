@@ -40,6 +40,32 @@ int check_and_log_memory_allocation_fail(void *mem, const char *file, int line)
     return 0;
 }
 
+void *new_data_buffer(const void *data, size_t len)
+{
+    void *data_buffer = malloc(LWS_PRE+len);
+    if (data_buffer == NULL)
+        return NULL;
+
+    if (data != NULL)
+        memcpy(&((unsigned char*)data_buffer)[LWS_PRE], data, len);
+
+    return data_buffer;
+}
+
+void *extend_data_buffer(void *data_buffer, size_t new_len)
+{
+    void *ext_buffer = realloc(data_buffer, LWS_PRE+new_len);
+    if (ext_buffer == NULL)
+        return NULL;
+
+    return ext_buffer;
+}
+
+void *data_buffer_data(void *data_buffer)
+{
+    return &((unsigned char*)data_buffer)[LWS_PRE];
+}
+
 // ======================================================================================
 
 static int callback_http(

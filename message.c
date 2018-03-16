@@ -3,21 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct message* new_message(const void *in, size_t len, size_t prefix_len)
+struct message* new_message(void *data_buffer, size_t len)
 {
     struct message *msg = malloc(sizeof(struct message));
     if (msg == NULL)
         return NULL;
 
     msg->buffer_length = len;
-    msg->buffer = malloc(prefix_len + len);
-    if (msg->buffer == NULL)
-    {
-        free(msg);
-        return NULL;
-    }
-
-    memcpy(&((unsigned char*)msg->buffer)[prefix_len], in, len);
+    msg->buffer = data_buffer;
+    
     msg->in_queues = 0;
 
     return msg;

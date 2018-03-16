@@ -75,7 +75,14 @@ int callback_broadcast_echo(
         case LWS_CALLBACK_RECEIVE:
             server_log_data(in, len);
 
-            msg = new_message(in, len, LWS_PRE);
+            void *data_buffer = new_data_buffer(in, len);
+            if (data_buffer == NULL)
+            {
+                stop_server();
+                break;
+            }
+
+            msg = new_message(data_buffer, len);
             if (has_memory_allocation_failed(msg))
             {
                 stop_server();

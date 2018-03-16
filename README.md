@@ -1,6 +1,6 @@
 # A WebSocket data exchange server
 
-## Dependencies:
+## Dependencies
 
 * gengetopt
 * libwebsockets
