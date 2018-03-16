@@ -1,6 +1,7 @@
 #include "server.h"
 #include "broadcast-echo-protocol.h"
 #include "clients-array.h"
+#include "queue.h"
 #include "message.h"
 #include "log.h"
 
@@ -17,7 +18,7 @@ void init_broadcast_echo_protocol(void)
 {
     clients_count = 0;
     clients = malloc(sizeof(struct lws*) * MAX_BROADCAST_ECHO_CLIENTS);
-    if (has_memory_allocation_failed(clients, __FILE__, __LINE__))
+    if (has_memory_allocation_failed(clients))
         stop_server();
 }
 
@@ -28,11 +29,8 @@ void deinit_broadcast_echo_protocol(void)
 
 // ======================================================================================
 
-static void register_message(struct lws **clients, size_t clients_count, struct lws *wsi, struct message *msg)
+static int register_message(struct lws **clients, size_t clients_count, struct lws *wsi, struct message *msg)
 {
-    if (msg == NULL)
-        return;
-
     struct per_session_data__broadcast_echo_protocol *psd;
     struct queue_node *node;
 
@@ -41,15 +39,15 @@ static void register_message(struct lws **clients, size_t clients_count, struct 
         {
             psd = lws_wsi_user(clients[i]);
             node = messages_queue_push(psd->messages_queue, msg);
-            if (has_memory_allocation_failed(node, __FILE__, __LINE__))
-            {
-                stop_server();
-                return;
-            }
+            if (has_memory_allocation_failed(node))
+                return 0;
+
             psd->messages_queue = node;
         }
 
     lws_callback_on_writable_all_protocol(lws_get_context(wsi), lws_get_protocol(wsi));
+
+    return 1;
 }
 
 // ======================================================================================
@@ -78,13 +76,17 @@ int callback_broadcast_echo(
             server_log_data(in, len);
 
             msg = new_message(in, len, LWS_PRE);
-            if (has_memory_allocation_failed(msg, __FILE__, __LINE__))
+            if (has_memory_allocation_failed(msg))
             {
                 stop_server();
                 break;
             }
 
-            register_message(clients, clients_count, wsi, msg);
+            if (!register_message(clients, clients_count, wsi, msg))
+            {
+                delete_message(msg);
+                stop_server();
+            }
             break;
 
         case LWS_CALLBACK_SERVER_WRITEABLE:

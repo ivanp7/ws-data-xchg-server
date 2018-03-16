@@ -1,5 +1,7 @@
 #pragma once
 
 void stop_server();
-int has_memory_allocation_failed(void *mem, const char *file, int line);
+
+#define has_memory_allocation_failed(mem) check_and_log_memory_allocation_fail(mem, __FILE__, __LINE__)
+int check_and_log_memory_allocation_fail(void *mem, const char *file, int line);
 

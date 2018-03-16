@@ -1,7 +1,5 @@
 #pragma once
 
-#include "queue.h"
-
 #include <libwebsockets.h>
 
 struct per_session_data__broadcast_echo_protocol

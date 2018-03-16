@@ -29,7 +29,7 @@ void stop_server()
     server_log_event("Shutting down.");
 }
 
-int has_memory_allocation_failed(void *mem, const char *file, int line)
+int check_and_log_memory_allocation_fail(void *mem, const char *file, int line)
 {
     if (mem == NULL)
     {

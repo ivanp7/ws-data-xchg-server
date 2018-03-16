@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct message* new_message(void *in, size_t len, size_t prefix_len)
+struct message* new_message(const void *in, size_t len, size_t prefix_len)
 {
     struct message *msg = malloc(sizeof(struct message));
     if (msg == NULL)
@@ -25,8 +25,11 @@ struct message* new_message(void *in, size_t len, size_t prefix_len)
 
 void delete_message(struct message *msg)
 {
-    free(msg->buffer);
-    free(msg);
+    if (msg->in_queues == 0)
+    {
+        free(msg->buffer);
+        free(msg);
+    }
 }
 
 struct queue_node* new_messages_queue()
@@ -58,8 +61,7 @@ struct queue_node* messages_queue_pop(struct queue_node *messages_queue)
     if (msg != NULL)
     {
         msg->in_queues--;
-        if (msg->in_queues == 0)
-            delete_message(msg);
+        delete_message(msg);
     }
 
     return queue_pop(messages_queue);
