@@ -2,11 +2,13 @@
 
 #include <libwebsockets.h>
 
+#define MAX_CLIENT_NAME_LENGTH (15)
+
 struct per_session_data__bulletin_board_protocol
 {
     struct queue_node *messages_queue;
 
-    char *client_name;
+    char client_name[MAX_CLIENT_NAME_LENGTH+1];
 
     void *data_buffer;
     size_t data_length;

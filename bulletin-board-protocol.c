@@ -30,27 +30,6 @@ void deinit_bulletin_board_protocol(void)
 
 // ======================================================================================
 
-#define MAX_CLIENT_NAME_LENGTH (16-1)
-
-static int is_client_name_valid(char *name, size_t len)
-{
-    if ((name == NULL) || (len == 0) || (len > MAX_CLIENT_NAME_LENGTH))
-        return 0;
-
-    char c;
-    for (int i = 0; i < len; i++)
-    {
-        c = name[i];
-        if (! (((c >= 'A') && (c <= 'Z')) || 
-                    ((c >= 'a') && (c <= 'z')) ||
-                    ((c >= '0') && (c <= '9')) || 
-                    (c == '-') || (c == '_')))
-            return 0;
-    }
-
-    return 1;
-}
-
 static int get_client_list(
         struct lws **clients, size_t clients_count, struct lws *wsi, char **response_buf, size_t *response_len)
 {
@@ -94,35 +73,86 @@ static int get_client_list(
     return 1;
 }
 
-static int parse_client_list(
-        struct lws **clients, size_t clients_count, const char *list_str, size_t len, 
-        struct lws ***selected_clients, int *num_clients)
-{
-    return 0;
-    // TODO: предотвращение ненужного повторного копирования данных
-}
-
 static int find_client_by_name(
-        struct lws **clients, size_t clients_count, const char *name, 
-        struct lws **wsi, struct per_session_data__bulletin_board_protocol **psd)
+        struct lws **clients, size_t clients_count, const char *name, size_t name_len, struct lws **wsi)
 {
     *wsi = NULL;
-    *psd = NULL;
 
     struct per_session_data__bulletin_board_protocol *p;
 
     for (size_t i = 0; i < clients_count; i++)
     {
         p = lws_wsi_user(clients[i]);
-        if (strcmp(p->client_name, name) == 0)
+        if (memcmp(p->client_name, name, name_len) == 0)
         {
             *wsi = clients[i];
-            *psd = p;
             return 1;
         }
     }
 
     return 0;
+}
+
+static int is_client_name_valid(const char *name, size_t len)
+{
+    if ((name == NULL) || (len == 0) || (len > MAX_CLIENT_NAME_LENGTH))
+        return 0;
+
+    char c;
+    for (int i = 0; i < len; i++)
+    {
+        c = name[i];
+        if (! (((c >= 'A') && (c <= 'Z')) || 
+                    ((c >= 'a') && (c <= 'z')) ||
+                    ((c >= '0') && (c <= '9')) || 
+                    (c == '-') || (c == '_')))
+            return 0;
+    }
+
+    return 1;
+}
+
+static int parse_client_list(
+        struct lws **clients, size_t clients_count, const char *list_str, size_t len, 
+        struct queue_node **selected_clients)
+{
+    *selected_clients = NULL;
+    struct queue_node *node;
+
+    struct lws *wsi;
+
+    char *token = memchr(list_str, ',', len);
+    size_t str_len;
+    while (1)
+    {
+        if (token == NULL)
+            str_len = len;
+        else
+            str_len = token - list_str;
+
+        if (!is_client_name_valid(list_str, str_len))
+            return 0;
+
+        find_client_by_name(clients, clients_count, list_str, str_len, &wsi);
+        if (wsi != NULL)
+        {
+            node = queue_push(*selected_clients, wsi);
+            if (node == NULL)
+                return 0;
+            *selected_clients = node;
+        }
+
+        if (token == NULL)
+            break;
+        else
+        {
+            list_str = token+1;
+            len -= str_len+1;
+            token = memchr(list_str, ',', len);
+        }
+    }
+
+    return 1;
 }
 
 // ======================================================================================
@@ -194,8 +224,11 @@ static int update_client_data(
 
 static int respond_with_stored_data(
         struct lws *wsi, struct per_session_data__bulletin_board_protocol *psd,
-        struct lws **selected_clients, int num_clients)
+        struct queue_node *selected_clients)
 {
+    if (selected_clients == NULL)
+        return 1;
+
     struct per_session_data__bulletin_board_protocol *p;
 
     size_t name_len;
@@ -205,9 +238,10 @@ static int respond_with_stored_data(
     char *response_buf_data;
 
     int result;
-    for (int i = 0; i < num_clients; i++)
+    while (selected_clients != NULL)
     {
-        p = lws_wsi_user(selected_clients[i]);
+        p = lws_wsi_user(queue_head(selected_clients));
+
         name_len = strlen(p->client_name);
 
         response_len = 2 + name_len + 1 + p->data_length;
@@ -216,6 +250,7 @@ static int respond_with_stored_data(
             char *new_buf = extend_data_buffer(response_buf, response_len);
             if (has_memory_allocation_failed(new_buf))
             {
+                free(response_buf);
                 result = 0;
                 break;
             }
@@ -233,15 +268,20 @@ static int respond_with_stored_data(
         result = respond_with_data(wsi, psd, response_buf, response_len);
         if (!result)
             break;
+
+        selected_clients = selected_clients->next;
     }
 
     return result;
 }
 
 static int respond_with_sent_data(
-        struct per_session_data__bulletin_board_protocol *psd, struct lws **selected_clients, 
-        int num_clients, void *data, size_t len)
+        struct per_session_data__bulletin_board_protocol *psd, struct queue_node *selected_clients, 
+        void *data, size_t len)
 {
+    if (selected_clients == NULL)
+        return 1;
+
     struct per_session_data__bulletin_board_protocol *p;
 
     size_t name_len = strlen(psd->client_name);
@@ -258,13 +298,15 @@ static int respond_with_sent_data(
     memcpy(response_buf_data + 2+name_len+1, data, len);
 
     int result;
-    for (int i = 0; i < num_clients; i++)
+    while (selected_clients != NULL)
     {
-        p = lws_wsi_user(selected_clients[i]);
+        p = lws_wsi_user(queue_head(selected_clients));
 
-        result = respond_with_data(selected_clients[i], p, response_buf, response_len);
+        result = respond_with_data(queue_head(selected_clients), p, response_buf, response_len);
         if (!result)
             break;
+
+        selected_clients = selected_clients->next;
     }
 
     return result;
@@ -279,15 +321,7 @@ static int accept_client_name(
     if (is_client_name_valid((char*)in, len) && 
             register_client(clients, clients_count, wsi, MAX_BULLETIN_BOARD_CLIENTS))
     {
-        psd->client_name = malloc(len+1);
-        if (has_memory_allocation_failed(psd->client_name))
-        {
-            forget_client(clients, clients_count, wsi);
-            return 0;
-        }
-
         memcpy(psd->client_name, in, len);
-        psd->client_name[len] = '\0';
 
         server_log_event("A client '%s' has registered.", psd->client_name);
         return respond_with_status(wsi, psd, STATUS_OK);
@@ -309,8 +343,7 @@ static int process_request(
     if (psd->client_name == NULL)
         return accept_client_name(clients, clients_count, wsi, psd, in, len);
 
-    struct lws **selected_clients;
-    int num_clients;
+    struct queue_node *selected_clients;
 
     int result;
     switch (((char*)in)[0])
@@ -337,12 +370,13 @@ static int process_request(
             if ((len < 2) || (((char*)in)[1] != ':'))
                 return respond_with_status(wsi, psd, STATUS_FAIL);
 
-            if (!parse_client_list(clients, *clients_count, (char*)in + 2, len-2, 
-                        &selected_clients, &num_clients))
-                return respond_with_status(wsi, psd, STATUS_FAIL);
+            if (parse_client_list(clients, *clients_count, (char*)in + 2, len-2, &selected_clients))
+                result = respond_with_stored_data(wsi, psd, selected_clients);
+            else
+                result = respond_with_status(wsi, psd, STATUS_FAIL);
 
-            result = respond_with_stored_data(wsi, psd, selected_clients, num_clients);
-            free(selected_clients);
+            while (selected_clients != NULL)
+                selected_clients = queue_pop(selected_clients);
             return result;
 
         /* case 's': */
@@ -350,22 +384,18 @@ static int process_request(
             if ((len < 2) || (((char*)in)[1] != ':'))
                 return respond_with_status(wsi, psd, STATUS_FAIL);
 
-            size_t pos = -1;
-            for (int i = 2; i < len; i++)
-                if (((char*)in)[i] == ':')
-                {
-                    pos = i;
-                    break;
-                }
+            void *delim = memchr((char*)in + 2, ':', len-2);
+            size_t pos = (delim != NULL)? (char*)delim - (char*)in + 2: -1;
             if (pos < 0)
                 return respond_with_status(wsi, psd, STATUS_FAIL);
 
-            if (!parse_client_list(clients, *clients_count, (char*)in + 2, pos-2, 
-                        &selected_clients, &num_clients))
-                return respond_with_status(wsi, psd, STATUS_FAIL);
+            if (parse_client_list(clients, *clients_count, (char*)in + 2, pos-2, &selected_clients))
+                result = respond_with_sent_data(psd, selected_clients, (char*)in + pos+1, len-pos-1);
+            else
+                result = respond_with_status(wsi, psd, STATUS_FAIL);
 
-            result = respond_with_sent_data(psd, selected_clients, num_clients, (char*)in + pos+1, len-pos-1);
-            free(selected_clients);
+            while (selected_clients != NULL)
+                selected_clients = queue_pop(selected_clients);
             return result;
 
         default:
@@ -390,7 +420,7 @@ int callback_bulletin_board(
             }
 
             psd->messages_queue = new_messages_queue();
-            psd->client_name = NULL;
+            memset(psd->client_name, '\0', MAX_CLIENT_NAME_LENGTH+1);
             psd->data_buffer = NULL;
             psd->data_length = 0;
             psd->buffer_length = 0;
