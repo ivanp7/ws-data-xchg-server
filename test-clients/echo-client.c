@@ -8,9 +8,10 @@
 
 static struct lws *web_socket = NULL;
 
-#define EXAMPLE_RX_BUFFER_BYTES (10)
+#define BUFFER_SIZE (10)
 
 char client_symbol = 'X';
+
 static int callback_broadcast_echo(
         struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
@@ -36,15 +37,13 @@ static int callback_broadcast_echo(
             printf("}\n");
             break;
 
-        case LWS_CALLBACK_CLIENT_WRITEABLE:
-        {
-            unsigned char buf[LWS_PRE + EXAMPLE_RX_BUFFER_BYTES];
+        case LWS_CALLBACK_CLIENT_WRITEABLE: ; //empy statement
+            unsigned char buf[LWS_PRE + BUFFER_SIZE];
             unsigned char *p = &buf[LWS_PRE];
             size_t n = sprintf((char*)p, "%u", rand()%1000);
             p[0] = client_symbol;
             lws_write(wsi, p, n, LWS_WRITE_BINARY);
             break;
-        }
 
         case LWS_CALLBACK_CLOSED:
         case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
@@ -88,7 +87,8 @@ int main(int argc, char *argv[])
     struct sigaction action;
     memset(&action, 0, sizeof(action));
     action.sa_handler = term;
-    sigaction(SIGINT, &action, NULL);
+    sigaction(SIGABRT, &action, NULL);
+    sigaction(SIGINT,  &action, NULL);
     sigaction(SIGTERM, &action, NULL);
 
     int port = 60000;

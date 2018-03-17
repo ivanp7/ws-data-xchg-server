@@ -44,7 +44,7 @@ Then, the communication is carried out using the following protocol.
 
 #### Responses:
 
-* O -- success;
+* K -- success;
 * F -- fail by the reason of the invalid request;
 * L:{name1},...,{nameN} -- list of all (excluding the requester) clients' names currently connected to the server;
 * R:{name}:{bytes of data} -- requested data of the client named {name};

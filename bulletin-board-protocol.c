@@ -47,12 +47,13 @@ static int get_client_list(
             *response_len += strlen(p->client_name);
         }
 
-    *response_buf = malloc(*response_len);
+    *response_buf = new_data_buffer(NULL, *response_len);
     if (has_memory_allocation_failed(*response_buf))
         return 0;
+    char *response_buf_data = data_buffer_data(*response_buf);
 
-    (*response_buf)[0] = 'L';
-    (*response_buf)[1] = ':';
+    response_buf_data[0] = 'L';
+    response_buf_data[1] = ':';
 
     pos = 2;
     for (size_t i = 0; i < clients_count; i++)
@@ -60,12 +61,12 @@ static int get_client_list(
         {
             p = lws_wsi_user(clients[i]);
             size = strlen(p->client_name);
-            memcpy(&(*response_buf)[pos], p->client_name, size);
+            memcpy(&response_buf_data[pos], p->client_name, size);
             pos += size;
 
             if (pos < *response_len)
             {
-                (*response_buf)[pos] = ',';
+                response_buf_data[pos] = ',';
                 pos++;
             }
         }
@@ -117,6 +118,9 @@ static int parse_client_list(
         struct queue_node **selected_clients)
 {
     *selected_clients = NULL;
+    if (len == 0)
+        return 1;
+
     struct queue_node *node;
 
     struct lws *wsi;
@@ -159,7 +163,7 @@ static int parse_client_list(
 
 #define STATUS_LENGTH 1
 
-#define STATUS_OK   "O"
+#define STATUS_OK   "K"
 #define STATUS_FAIL "F"
 
 static int respond(
@@ -168,10 +172,9 @@ static int respond(
     struct queue_node *node = messages_queue_push(psd->messages_queue, msg);
     if (has_memory_allocation_failed(node))
         return 0;
-
     psd->messages_queue = node;
+    
     lws_callback_on_writable(wsi);
-
     return 1;
 }
 
@@ -233,8 +236,7 @@ static int respond_with_stored_data(
 
     size_t name_len;
     size_t response_len;
-    void *response_buf = NULL;
-    size_t buf_len = 0;
+    void *response_buf;
     char *response_buf_data;
 
     int result;
@@ -245,17 +247,11 @@ static int respond_with_stored_data(
         name_len = strlen(p->client_name);
 
         response_len = 2 + name_len + 1 + p->data_length;
-        if (response_len > buf_len)
+        response_buf = new_data_buffer(NULL, response_len);
+        if (has_memory_allocation_failed(response_buf))
         {
-            char *new_buf = extend_data_buffer(response_buf, response_len);
-            if (has_memory_allocation_failed(new_buf))
-            {
-                free(response_buf);
-                result = 0;
-                break;
-            }
-            response_buf = new_buf;
-            buf_len = response_len;
+            result = 0;
+            break;
         }
 
         response_buf_data = data_buffer_data(response_buf);
@@ -282,6 +278,7 @@ static int respond_with_sent_data(
     if (selected_clients == NULL)
         return 1;
 
+    struct lws *wsi;
     struct per_session_data__bulletin_board_protocol *p;
 
     size_t name_len = strlen(psd->client_name);
@@ -297,14 +294,20 @@ static int respond_with_sent_data(
     response_buf_data[2+name_len] = ':';
     memcpy(response_buf_data + 2+name_len+1, data, len);
 
+    struct message *msg = new_message(response_buf, response_len);
+
     int result;
     while (selected_clients != NULL)
     {
-        p = lws_wsi_user(queue_head(selected_clients));
+        wsi = queue_head(selected_clients);
+        p = lws_wsi_user(wsi);
 
-        result = respond_with_data(queue_head(selected_clients), p, response_buf, response_len);
+        result = respond(wsi, p, msg);
         if (!result)
+        {
+            delete_message(msg);
             break;
+        }
 
         selected_clients = selected_clients->next;
     }
@@ -340,7 +343,7 @@ static int process_request(
     if (len == 0)
         return respond_with_status(wsi, psd, STATUS_FAIL);
 
-    if (psd->client_name == NULL)
+    if (strlen(psd->client_name) == 0)
         return accept_client_name(clients, clients_count, wsi, psd, in, len);
 
     struct queue_node *selected_clients;
@@ -350,6 +353,9 @@ static int process_request(
     {
         /* case 'l': */
         case 'L': ; // empty statement
+            if (len > 1)
+                return respond_with_status(wsi, psd, STATUS_FAIL);
+
             char *response_buf;
             size_t response_len;
             if (!get_client_list(clients, *clients_count, wsi, &response_buf, &response_len))
@@ -381,16 +387,16 @@ static int process_request(
 
         /* case 's': */
         case 'S':
-            if ((len < 2) || (((char*)in)[1] != ':'))
+            if ((len < 3) || (((char*)in)[1] != ':'))
                 return respond_with_status(wsi, psd, STATUS_FAIL);
 
             void *delim = memchr((char*)in + 2, ':', len-2);
-            size_t pos = (delim != NULL)? (char*)delim - (char*)in + 2: -1;
+            int pos = (delim != NULL)? (char*)delim - ((char*)in + 2): -1;
             if (pos < 0)
                 return respond_with_status(wsi, psd, STATUS_FAIL);
 
-            if (parse_client_list(clients, *clients_count, (char*)in + 2, pos-2, &selected_clients))
-                result = respond_with_sent_data(psd, selected_clients, (char*)in + pos+1, len-pos-1);
+            if (parse_client_list(clients, *clients_count, (char*)in + 2, pos, &selected_clients))
+                result = respond_with_sent_data(psd, selected_clients, (char*)in + 2+pos+1, len-2-pos-1);
             else
                 result = respond_with_status(wsi, psd, STATUS_FAIL);
 
@@ -436,15 +442,17 @@ int callback_bulletin_board(
             break;
 
         case LWS_CALLBACK_SERVER_WRITEABLE:
-            if (psd->client_name == NULL)
+            if (strlen(psd->client_name) == 0)
+                break;
+
+            if (psd->messages_queue == NULL)
                 break;
 
             struct message *msg = queue_head(psd->messages_queue);
-            if (msg == NULL)
-                break;
-
             lws_write(wsi, &((unsigned char*)msg->buffer)[LWS_PRE], msg->buffer_length, LWS_WRITE_BINARY);
             psd->messages_queue = messages_queue_pop(psd->messages_queue);
+            if (psd->messages_queue != NULL)
+                lws_callback_on_writable(wsi);
             break;
 
         case LWS_CALLBACK_CLOSED:
@@ -452,7 +460,6 @@ int callback_bulletin_board(
                 forget_client(clients, &clients_count, wsi);
 
             psd->messages_queue = delete_messages_queue(psd->messages_queue);
-            free(psd->client_name);
             free(psd->data_buffer);
 
             server_log_event("A client has disconnected.");

@@ -8,10 +8,12 @@
 
 static struct lws *web_socket = NULL;
 
-#define EXAMPLE_RX_BUFFER_BYTES (10)
+#define BUFFER_SIZE (100)
+char buffer[LWS_PRE+BUFFER_SIZE+1] = {'\0'};
 
-char client_symbol = 'X';
-static int callback_broadcast_echo(
+int ready = 0;
+
+static int callback_bulletin_board(
         struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len)
 {
     switch (reason)
@@ -34,17 +36,22 @@ static int callback_broadcast_echo(
                     printf("%c", c);
             }
             printf("}\n");
+
+            ready = 1;
             break;
 
-        case LWS_CALLBACK_CLIENT_WRITEABLE:
-        {
-            unsigned char buf[LWS_PRE + EXAMPLE_RX_BUFFER_BYTES];
-            unsigned char *p = &buf[LWS_PRE];
-            size_t n = sprintf((char*)p, "%u", rand()%1000);
-            p[0] = client_symbol;
-            lws_write(wsi, p, n, LWS_WRITE_BINARY);
+        case LWS_CALLBACK_CLIENT_WRITEABLE: ; //empty statement
+            char *p = &buffer[LWS_PRE];
+            size_t plen = strlen(p);
+            if (plen > BUFFER_SIZE+1)
+                plen = BUFFER_SIZE+1;
+
+            if (plen > 0)
+            {
+                lws_write(wsi, (unsigned char*)p, plen, LWS_WRITE_BINARY);
+                printf("Sent %li bytes\n", plen);
+            }
             break;
-        }
 
         case LWS_CALLBACK_CLOSED:
         case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
@@ -60,15 +67,15 @@ static int callback_broadcast_echo(
 
 enum protocols
 {
-    PROTOCOL_BROADCAST_ECHO = 0,
+    PROTOCOL_BULLETIN_BOARD = 0,
     PROTOCOL_COUNT
 };
 
 static struct lws_protocols protocols[] =
 {
     {
-        "broadcast-echo-protocol",
-        callback_broadcast_echo,
+        "bulletin-board-protocol",
+        callback_bulletin_board,
         0
     },
     { NULL, NULL, 0 } /* terminator */
@@ -88,15 +95,16 @@ int main(int argc, char *argv[])
     struct sigaction action;
     memset(&action, 0, sizeof(action));
     action.sa_handler = term;
-    sigaction(SIGINT, &action, NULL);
+    sigaction(SIGABRT, &action, NULL);
+    sigaction(SIGINT,  &action, NULL);
     sigaction(SIGTERM, &action, NULL);
 
     int port = 60000;
     if (argc > 1)
-        client_symbol = argv[1][0];
+        strcpy(&buffer[LWS_PRE], argv[1]);
     if (argc > 2)
         port = atoi(argv[2]);
-    printf("Client symbol: %c\n", client_symbol);
+    printf("Client name: %s\n", &buffer[LWS_PRE]);
     printf("Connecting to port number %i\n", port);
 
     struct lws_context_creation_info info;
@@ -117,25 +125,45 @@ int main(int argc, char *argv[])
         ccinfo.path = "/";
         ccinfo.host = lws_canonical_hostname(context);
         ccinfo.origin = "origin";
-        ccinfo.protocol = protocols[PROTOCOL_BROADCAST_ECHO].name;
+        ccinfo.protocol = protocols[PROTOCOL_BULLETIN_BOARD].name;
         web_socket = lws_client_connect_via_info(&ccinfo);
     }
+    printf("Connected to the server.\n");
 
-    time_t old = 0;
+    // Main loop
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    time_t old = tv.tv_sec;
+
     while (!done && web_socket)
     {
-        struct timeval tv;
+        lws_service(context, 50);
         gettimeofday(&tv, NULL);
 
-        if (tv.tv_sec != old)
+        if (ready)
         {
-            /* Send a random number to the server every second. */
-            lws_callback_on_writable(web_socket);
-            old = tv.tv_sec;
-        }
+            char *pos;
+            printf("> ");
+            fgets(&buffer[LWS_PRE], BUFFER_SIZE, stdin);
+            if ((pos = memchr(&buffer[LWS_PRE], '\n', BUFFER_SIZE+1)) != NULL)
+                *pos = '\0';
+            else
+                buffer[LWS_PRE+BUFFER_SIZE] = '\0';
 
-        lws_service(context, 50);
+            if (strlen(&buffer[LWS_PRE]) > 0)
+            {
+                ready = 0;
+                old = tv.tv_sec;
+            }
+            lws_callback_on_writable(web_socket);
+        }
+        else
+        {
+            if (tv.tv_sec - old > 2)
+                ready = 1;
+        }
     }
+    printf("Disconnected from the server.\n");
 
     lws_context_destroy(context);
 
