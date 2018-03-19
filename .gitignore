@@ -2,4 +2,5 @@
 cmdline.h
 cmdline.c
 ws-data-xchg-server
+server.log
 
