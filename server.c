@@ -100,6 +100,11 @@ static struct lws_protocols protocols[] =
         0,             /* No per session data. */
     },
     {
+        "13", // backward compatibility with the old server
+        callback_broadcast_echo,
+        sizeof(struct per_session_data__broadcast_echo_protocol),
+    },
+    {
         "broadcast-echo-protocol",
         callback_broadcast_echo,
         sizeof(struct per_session_data__broadcast_echo_protocol),
