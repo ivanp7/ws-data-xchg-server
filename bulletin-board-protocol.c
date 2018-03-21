@@ -197,11 +197,15 @@ static int respond_with_data(
 static int respond_with_status(
         struct lws *wsi, struct per_session_data__bulletin_board_protocol *psd, const char *s)
 {
-    void *data_buffer = new_data_buffer(s, STATUS_LENGTH);
+    void *data_buffer = new_data_buffer(NULL, 2+STATUS_LENGTH);
     if (data_buffer == NULL)
         return 0;
+    char *db_data = data_buffer_data(data_buffer);
+    db_data[0] = 'A';
+    db_data[1] = ':';
+    memcpy(db_data+2, s, STATUS_LENGTH);
 
-    return respond_with_data(wsi, psd, data_buffer, STATUS_LENGTH);
+    return respond_with_data(wsi, psd, data_buffer, 2+STATUS_LENGTH);
 }
 
 // ======================================================================================

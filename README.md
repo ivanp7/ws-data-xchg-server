@@ -35,9 +35,9 @@ After connecting to the server, a client is required to register by sending
 its name with the very first message to the server. A correct name is a string
 shorter than 16 characters
 that does not contain any other characters except 'A'-'Z', 'a'-'z', '0'-'9', '-' and '\_'.
-The server responds with "K" on success and "F" on fail.
+The server responds with "A:K" on success and "A:F" on fail.
 Then, the communication is carried out using the following protocol.
-The server responds with "F" on any invalid request.
+The server responds with "A:F" on any invalid request.
 
 ### Requests & responses
 
@@ -47,7 +47,7 @@ The server responds with "F" on any invalid request.
 
 * request:  "P:{bytes of data}" -- publish (store) client's {bytes of data} on the server,
 
-  response: "K" on success and "F" on fail;
+  response: "A:K" on success and "A:F" on fail;
 
 * request:  "R:{name1},...,{nameN}" -- request the stored data of the clients with names {name1}, ..., {nameN};
 
