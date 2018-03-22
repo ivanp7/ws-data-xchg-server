@@ -4,6 +4,7 @@
 
 * gengetopt
 * libwebsockets
+* Protocol Buffers
 
 ## Installation
 
@@ -30,30 +31,90 @@ except the message authors.
 ## Bulletin board ("bulletin-board-protocol")
 
 The server implements the bulletin board intercommunication model.
+See the [bulletin board protocol buffers file](protocols/bulletin-board/protobuf/protocol.proto).
 
-After connecting to the server, a client is required to register by sending
-its name with the very first message to the server. A correct name is a string
-shorter than 16 characters
+### Operations
+
+If got an invalid or malformed request, the server responds with a message with the following info:
+```
+response_type = AUX_INFO
+aux_info[0].str = "error"
+aux_info[0].num = <error code>
+```
+
+#### Registration
+
+Right after connecting to the server, a client is required to register by sending
+a message with the following info:
+```
+request_type = REGISTER
+aux_info[0].str = <client name>
+```
+
+A correct name is a string shorter than 16 characters
 that does not contain any other characters except 'A'-'Z', 'a'-'z', '0'-'9', '-' and '\_'.
-The server responds with "A:K" on success and "A:F" on fail.
-Then, the communication is carried out using the following protocol.
-The server responds with "A:F" on any invalid request.
 
-### Requests & responses
+#### Querying meta info
 
-* request:  "L" -- request the list of all other registered clients' names currently connected to the server,
+Querying is carried out with the following request:
+```
+request_type = QUERY
+aux_info[0].str = <wanted info type>
+```
 
-  response: "L:{name1},...,{nameN}" -- list of all other registered clients' names currently connected to the server;
+Supported info types at the moment include:
+* "client-name-list" -- get a list of names of all connected registered clients, excluding the self;
+* "data-field-list" -- get a list of field names of the specified clients.
 
-* request:  "P:{bytes of data}" -- publish (store) client's {bytes of data} on the server,
+The server will respond with the 'META\_INFO' type of message, which will
+contain the requested info in the corresponding places.
 
-  response: "A:K" on success and "A:F" on fail;
+#### Downloading data
 
-* request:  "R:{name1},...,{nameN}" -- request the stored data of the clients with names {name1}, ..., {nameN};
+Downloading is carried out with the following request:
+```
+request_type = DOWNLOAD
+clients = <wanted client names list>
+data[].name = <wanted data fields>
+```
 
-  response: "R:{name}:{bytes of data}" -- requested data of the client named {name};
+The server will respond with the bunch of messages of the following format:
+```
+response_type = DATA
+aux_info[0].str = "data-requested"
+clients = <name of the data owner>
+data = <requested data>
+```
 
-* request:  "S:{name1},...,{nameN}:{bytes of data}" -- send {bytes of data} directly to the clients with the specified names.
+#### Uploading data
 
-  response: none or "S:{name}:{bytes of data}" -- data directly sent by the client named {name}.
+Uploading is carried out with the following request:
+```
+request_type = UPLOAD
+data = <uploaded data>
+```
+
+The server will respond with the confirmation:
+```
+response_type = AUX_INFO
+aux_info[0].str = "error"
+aux_info[0].num = 0
+```
+
+#### Forwarding data
+
+Forwarding is carried out with the following request:
+```
+request_type = FORWARD
+clients = <recipient client names list>
+data = <sent data>
+```
+
+The recipients will receive the following messages:
+```
+response_type = DATA
+aux_info[0].str = "data-sent"
+clients = <name of the data sender>
+data = <sent data>
+```
 
