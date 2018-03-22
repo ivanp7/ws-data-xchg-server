@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package server_protocols.bulletin_board;
+
+enum bb_request
+{
+    QUERY    = 0;
+    DOWNLOAD = 1;
+
+    UPLOAD   = 2;
+    FORWARD  = 3;
+}
+
+enum bb_response
+{
+    STATUS    = 0;
+
+    META_INFO = 1;
+    DATA      = 2;
+}
+
+message bb_data_field
+{
+    string name  = 1;
+    bytes  value = 2;
+}
+
+message bb_msg_aux_info
+{
+    string str = 1;
+    int64 num  = 2;
+}
+
+message bb_message
+{
+    oneof message_type
+    {
+        request  bb_request_type  = 1;
+        response bb_response_type = 2;
+    }
+
+    repeated string clients     = 3;
+    repeated bb_data_field data = 4;
+
+    repeated bb_msg_aux_info aux_info = 5;
+}
+
