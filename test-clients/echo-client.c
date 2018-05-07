@@ -91,11 +91,15 @@ int main(int argc, char *argv[])
     sigaction(SIGINT,  &action, NULL);
     sigaction(SIGTERM, &action, NULL);
 
+    char *address = "localhost";
     int port = 60000;
     if (argc > 1)
         client_symbol = argv[1][0];
     if (argc > 2)
-        port = atoi(argv[2]);
+        address = argv[2];
+    if (argc > 3)
+        port = atoi(argv[3]);
+
     printf("Client symbol: %c\n", client_symbol);
     printf("Connecting to port number %i\n", port);
 
@@ -112,7 +116,7 @@ int main(int argc, char *argv[])
     {
         struct lws_client_connect_info ccinfo = {0};
         ccinfo.context = context;
-        ccinfo.address = "localhost";
+        ccinfo.address = address;
         ccinfo.port = port;
         ccinfo.path = "/";
         ccinfo.host = lws_canonical_hostname(context);
