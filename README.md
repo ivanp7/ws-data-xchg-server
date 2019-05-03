@@ -4,6 +4,7 @@
 
 * gengetopt
 * libwebsockets
+* cjson
 
 ## Installation
 
@@ -25,7 +26,7 @@ The server responds with the simple HTML page telling that it is online.
 ## Broadcast echo ("broadcast-echo-protocol")
 
 The server forwards incoming messages without any change to the all connected clients
-except the message authors.
+except the addresser.
 
 ## Bulletin board ("bulletin-board-protocol")
 
@@ -56,4 +57,10 @@ The server responds with "A:F" on any invalid request.
 * request:  "S:{name1},...,{nameN}:{bytes of data}" -- send {bytes of data} directly to the clients with the specified names.
 
   response: none or "S:{name}:{bytes of data}" -- data directly sent by the client named {name}.
+
+## JSON transmission ("json-transmission-protocol")
+
+Clients send JSON strings to the server. To be processed correctly, JSON must contain two fields: "from" and "to".
+The "to" field specifies name of the addressee client.
+The "from" field specifies name of the addresser client. If this name is changed from the last time, then it is used as a new client's name.
 

@@ -6,6 +6,7 @@
 #include "log.h"
 #include "broadcast-echo-protocol.h"
 #include "bulletin-board-protocol.h"
+#include "json-transmission-protocol.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -88,6 +89,7 @@ enum protocols
     PROTOCOL_HTTP = 0,
     PROTOCOL_BROADCAST_ECHO,
     PROTOCOL_BULLETIN_BOARD,
+    PROTOCOL_JSON_TRANSMISSION,
     PROTOCOL_COUNT
 };
 
@@ -113,6 +115,11 @@ static struct lws_protocols protocols[] =
         "bulletin-board-protocol",
         callback_bulletin_board,
         sizeof(struct per_session_data__bulletin_board_protocol),
+    },
+    {
+        "json-transmission-protocol",
+        callback_json_transmission_protocol,
+        sizeof(struct per_session_data__json_transmission_protocol),
     },
     { NULL, NULL, 0 } /* terminator */
 };
@@ -178,6 +185,7 @@ int main(int argc, char *argv[])
 
     init_broadcast_echo_protocol();
     init_bulletin_board_protocol();
+    init_json_transmission_protocol();
 
     while (is_server_running())
     {
@@ -188,6 +196,7 @@ int main(int argc, char *argv[])
 
     deinit_broadcast_echo_protocol();
     deinit_bulletin_board_protocol();
+    deinit_json_transmission_protocol();
 
     server_log_event("The server has been stopped.");
     return 0;

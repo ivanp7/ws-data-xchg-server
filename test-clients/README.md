@@ -16,3 +16,11 @@
 ./bulletin-client {unique name} {server port}
 ```
 
+## json-transmission-protocol -> json-client
+
+### Usage:
+
+```
+./json-client {server port}
+```
+

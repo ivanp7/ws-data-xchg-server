@@ -58,7 +58,7 @@ void server_log_data(void *in, size_t len)
             N = server_log_data_output_limit;
 
         unsigned char c;
-        fprintf(stdout, ": {");
+        fprintf(stdout, ": <<");
         for (int i = 0; i < N; i++)
         {
             c = (unsigned char)((char*)in)[i];
@@ -67,7 +67,7 @@ void server_log_data(void *in, size_t len)
             else
                 fprintf(stdout, "%c", c);
         }
-        fprintf(stdout, "}");
+        fprintf(stdout, ">>");
     }
     
     fprintf(stdout, "\n");
