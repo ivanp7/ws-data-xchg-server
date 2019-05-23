@@ -3,7 +3,7 @@
 #include <libwebsockets.h>
 #include <cjson/cJSON.h>
 
-#define MAX_CLIENT_NAME_LENGTH (15)
+#define MAX_CLIENT_NAME_LENGTH (64)
 
 struct per_session_data__json_transmission_protocol
 {
